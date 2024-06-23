@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -10,25 +9,49 @@ import (
 	"os/exec"
 	"path"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 func main() {
 
-	go func() {
+	var (
+		rootCmd                 = cobra.Command{}
+		defaultDotFileDirectory = func() string {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				log.Println("Unable to access home directory:", err)
+				os.Exit(1)
+			}
 
-		cmd := exec.Command("smee", "--url", "https://smee.io/awFay3gs7LCGYe2", "--path", "/webhook", "--port", "3000")
+			return path.Join(homeDir, "dotfiles")
+		}()
+	)
+
+	port := rootCmd.Flags().StringP("port", "p", "3000", "HTTP port to run on")
+	webhookUrl := rootCmd.Flags().StringP("webhook", "w", "https://smee.io/awFay3gs7LCGYe2", "git webhook url")
+	dotFilePath := rootCmd.Flags().StringP("dotfile-path", "d", defaultDotFileDirectory, "path to dotfile directory")
+
+	if err := rootCmd.Execute(); err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+
+	go func() {
+		cmd := exec.Command("smee", "--url", *webhookUrl, "--path", "/webhook", "--port", *port)
 		stdOutput, err := cmd.StdoutPipe()
 		stdErr, err := cmd.StderrPipe()
 
 		if err := cmd.Start(); err != nil {
-			panic(err)
+			log.Println(err.Error())
+			os.Exit(1)
 		}
 
 		if stdErr != nil {
 			buf := bufio.NewReader(stdErr)
 			line, _ := buf.ReadString('\n')
-			log.Println("Failed to start smee.io server:", line)
-			os.Exit(1)
+			log.Println("Error:", line)
+			return
 		}
 
 		cmdOutput := io.MultiReader(stdOutput, stdErr)
@@ -43,7 +66,7 @@ func main() {
 
 	time.Sleep(3 * time.Second) // wait for smee server startup
 
-	log.Println("smee.io Server started successfully")
+	log.Println("webhook server forwarded successfully from", *webhookUrl, "to port", *port)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", func(writer http.ResponseWriter, request *http.Request) {
@@ -52,10 +75,7 @@ func main() {
 		if event == "push" {
 			log.Println("push event detected")
 
-			homeDir, err := os.UserHomeDir()
-			dotFileDir := path.Join(homeDir, "dotfiles")
-
-			err = os.Chdir(dotFileDir)
+			err := os.Chdir(*dotFilePath)
 			if err != nil {
 				log.Println(err)
 			}
@@ -70,13 +90,12 @@ func main() {
 			// run stow
 			err = exec.Command("stow", ".").Run()
 			if err != nil {
-				fmt.Println("stow execution failed: ", err)
+				log.Println("stow execution failed: ", err)
 			} else {
 				log.Println("stow execution succeeded")
 			}
 		}
 	})
 
-	log.Fatal(http.ListenAndServe(":3000", mux))
-
+	log.Fatal(http.ListenAndServe(":"+*port, mux))
 }
