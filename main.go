@@ -4,30 +4,58 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"time"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func main() {
 
-	go func() {
+	var (
+		webHookUrl  = useOrDefault()
+		port        = "3000"
+		dotFilePath = func() string {
+			homeDir, _ := os.UserHomeDir()
+			return path.Join(homeDir, "dotfiles")
+		}()
 
-		cmd := exec.Command("smee", "--url", "https://smee.io/awFay3gs7LCGYe2", "--path", "/webhook", "--port", "3000")
+		rootCmd = cobra.Command{
+			Run: func(c *cobra.Command, args []string) {
+				webHookUrl = useOrDefault(c.Flag("webhook"), "http://48.217.222.93:3000/ZLe6soOKhrpzUEA")
+				port = useOrDefault(c.Flag("port"), "3000")
+				dotFilePath = useOrDefault(c.Flag("dotfile-path"), 
+			},
+		}
+	)
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	fmt.Println(webHookUrl)
+	fmt.Println(port)
+	fmt.Println(dotFilePath)
+
+	go func() {
+		cmd := exec.Command("smee", "--url", webHookUrl, "--path", "/webhook", "--port", port)
 		stdOutput, err := cmd.StdoutPipe()
 		stdErr, err := cmd.StderrPipe()
 
 		if err := cmd.Start(); err != nil {
-			panic(err)
+			fmt.Println(err.Error())
+			os.Exit(1)
 		}
 
 		if stdErr != nil {
 			buf := bufio.NewReader(stdErr)
 			line, _ := buf.ReadString('\n')
-			log.Println("Failed to start smee.io server:", line)
+			fmt.Println("Failed to start smee.io server:", line)
 			os.Exit(1)
 		}
 
@@ -36,35 +64,32 @@ func main() {
 		line, err := bufOutput.ReadString('\n')
 
 		for err == nil {
-			log.Print(line)
+			fmt.Print(line)
 			line, err = bufOutput.ReadString('\n')
 		}
 	}()
 
 	time.Sleep(3 * time.Second) // wait for smee server startup
 
-	log.Println("smee.io Server started successfully")
+	fmt.Println("smee.io Server started successfully")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", func(writer http.ResponseWriter, request *http.Request) {
 
 		event := request.Header.Get("x-github-event")
 		if event == "push" {
-			log.Println("push event detected")
+			fmt.Println("push event detected")
 
-			homeDir, err := os.UserHomeDir()
-			dotFileDir := path.Join(homeDir, "dotfiles")
-
-			err = os.Chdir(dotFileDir)
+			err := os.Chdir(dotFilePath)
 			if err != nil {
-				log.Println(err)
+				fmt.Println(err)
 			}
 
 			err = exec.Command("git", "pull", "origin", "main").Run()
 			if err != nil {
-				log.Printf("git repository failed to pull [%s]\n", err)
+				fmt.Printf("git repository failed to pull [%s]\n", err)
 			} else {
-				log.Println("git repository pulled successfully")
+				fmt.Println("git repository pulled successfully")
 			}
 
 			// run stow
@@ -72,11 +97,16 @@ func main() {
 			if err != nil {
 				fmt.Println("stow execution failed: ", err)
 			} else {
-				log.Println("stow execution succeeded")
+				fmt.Println("stow execution succeeded")
 			}
 		}
 	})
+}
 
-	log.Fatal(http.ListenAndServe(":3000", mux))
+func useOrDefault(value *pflag.Flag, defaultValue func() string) string {
+	if value == nil {
+		_ = value.Value.Set(defaultValue())
+	}
 
+	return value.Value.String()
 }
