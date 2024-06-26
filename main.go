@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -10,12 +12,16 @@ import (
 	"path"
 	"time"
 
+	"github.com/haibeey/doclite"
 	"github.com/spf13/cobra"
 )
 
 func main() {
 
 	var (
+		db = func() *doclite.Doclite {
+			return doclite.Connect("dotfile-agent.doclite")
+		}
 		rootCmd                 = cobra.Command{}
 		defaultDotFileDirectory = func() string {
 			homeDir, err := os.UserHomeDir()
@@ -26,6 +32,8 @@ func main() {
 
 			return path.Join(homeDir, "dotfiles")
 		}()
+
+		syncHandler = SyncHandler{dotFilePath: defaultDotFileDirectory}
 	)
 
 	port := rootCmd.Flags().StringP("port", "p", "3000", "HTTP port to run on")
@@ -38,6 +46,7 @@ func main() {
 	}
 
 	go func() {
+		fmt.Println("khnbbinb")
 		cmd := exec.Command("smee", "--url", *webhookUrl, "--path", "/webhook", "--port", *port)
 		stdOutput, err := cmd.StdoutPipe()
 		stdErr, err := cmd.StderrPipe()
@@ -69,30 +78,32 @@ func main() {
 	log.Println("webhook server forwarded successfully from", *webhookUrl, "to port", *port)
 
 	mux := http.NewServeMux()
+
+	// register handlers
+	mux.HandleFunc("/sync", syncHandler.Sync)
 	mux.HandleFunc("/webhook", func(writer http.ResponseWriter, request *http.Request) {
+
+		var commit GitPull
+
+		err := json.NewDecoder(request.Body).Decode(&commit)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		err = db.Create(commit)
+		db.data.Commit()
+		fmt.Println(err)
+
+		fmt.Println(db.data.GetCol().Name)
 
 		event := request.Header.Get("x-github-event")
 		if event == "push" {
-			log.Println("push event detected")
+			log.Println("push event detected...")
 
-			err := os.Chdir(*dotFilePath)
+			err := SyncExec(*dotFilePath)
 			if err != nil {
-				log.Println(err)
-			}
-
-			err = exec.Command("git", "pull", "origin", "main").Run()
-			if err != nil {
-				log.Printf("git repository failed to pull [%s]\n", err)
-			} else {
-				log.Println("git repository pulled successfully")
-			}
-
-			// run stow
-			err = exec.Command("stow", ".").Run()
-			if err != nil {
-				log.Println("stow execution failed: ", err)
-			} else {
-				log.Println("stow execution succeeded")
+				log.Println("error syncing:", err)
+				return
 			}
 		}
 	})
