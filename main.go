@@ -21,7 +21,8 @@ func main() {
 	var (
 		db = func() *doclite.Doclite {
 			return doclite.Connect("dotfile-agent.doclite")
-		}
+		}()
+
 		rootCmd                 = cobra.Command{}
 		defaultDotFileDirectory = func() string {
 			homeDir, err := os.UserHomeDir()
@@ -36,6 +37,13 @@ func main() {
 		syncHandler = SyncHandler{dotFilePath: defaultDotFileDirectory}
 	)
 
+	defer func(db *doclite.Doclite) {
+		err := db.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(db)
+
 	port := rootCmd.Flags().StringP("port", "p", "3000", "HTTP port to run on")
 	webhookUrl := rootCmd.Flags().StringP("webhook", "w", "https://smee.io/awFay3gs7LCGYe2", "git webhook url")
 	dotFilePath := rootCmd.Flags().StringP("dotfile-path", "d", defaultDotFileDirectory, "path to dotfile directory")
@@ -46,7 +54,6 @@ func main() {
 	}
 
 	go func() {
-		fmt.Println("khnbbinb")
 		cmd := exec.Command("smee", "--url", *webhookUrl, "--path", "/webhook", "--port", *port)
 		stdOutput, err := cmd.StdoutPipe()
 		stdErr, err := cmd.StderrPipe()
@@ -90,11 +97,20 @@ func main() {
 			fmt.Println(err)
 		}
 
-		err = db.Create(commit)
-		db.data.Commit()
-		fmt.Println(err)
+		id, err := db.Base().Insert(commit)
+		if err != nil {
+			fmt.Println("")
+		}
 
-		fmt.Println(db.data.GetCol().Name)
+		db.Commit()
+
+		g := &GitPull{}
+
+		err = db.Base().FindOne(id, g)
+		if err != nil {
+			fmt.Println("df")
+		}
+		fmt.Println(g)
 
 		event := request.Header.Get("x-github-event")
 		if event == "push" {

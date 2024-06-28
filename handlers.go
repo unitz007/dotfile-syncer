@@ -9,6 +9,7 @@ import (
 
 type SyncHandler struct {
 	dotFilePath string
+	db          Database
 }
 
 func (s SyncHandler) Sync(writer http.ResponseWriter, request *http.Request) {
