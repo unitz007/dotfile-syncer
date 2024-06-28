@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -20,7 +21,7 @@ func main() {
 		defaultDotFileDirectory = func() string {
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
-				log.Println("Unable to access home directory:", err)
+				fmt.Println("Unable to access home directory:", err)
 				os.Exit(1)
 			}
 
@@ -33,7 +34,7 @@ func main() {
 	dotFilePath := rootCmd.Flags().StringP("dotfile-path", "d", defaultDotFileDirectory, "path to dotfile directory")
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Println(err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
@@ -42,15 +43,19 @@ func main() {
 		stdOutput, err := cmd.StdoutPipe()
 		stdErr, err := cmd.StderrPipe()
 
+		if err != nil {
+			fmt.Println(err)
+		}
+
 		if err := cmd.Start(); err != nil {
-			log.Println(err.Error())
+			fmt.Println(err.Error())
 			os.Exit(1)
 		}
 
 		if stdErr != nil {
 			buf := bufio.NewReader(stdErr)
 			line, _ := buf.ReadString('\n')
-			log.Println("Error:", line)
+			fmt.Println("Error:", line)
 			return
 		}
 
@@ -59,40 +64,40 @@ func main() {
 		line, err := bufOutput.ReadString('\n')
 
 		for err == nil {
-			log.Print(line)
+			fmt.Print(line)
 			line, err = bufOutput.ReadString('\n')
 		}
 	}()
 
-	time.Sleep(3 * time.Second) // wait for smee server startup
+	time.Sleep(2 * time.Second) // wait for smee server startup
 
-	log.Println("webhook server forwarded successfully from", *webhookUrl, "to port", *port)
+	fmt.Println("webhook server forwarded successfully from", *webhookUrl, "to port", *port)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", func(writer http.ResponseWriter, request *http.Request) {
 
 		event := request.Header.Get("x-github-event")
 		if event == "push" {
-			log.Println("push event detected")
+			fmt.Println("push event detected")
 
 			err := os.Chdir(*dotFilePath)
 			if err != nil {
-				log.Println(err)
+				fmt.Println(err)
 			}
 
 			err = exec.Command("git", "pull", "origin", "main").Run()
 			if err != nil {
-				log.Printf("git repository failed to pull [%s]\n", err)
+				fmt.Printf("git repository failed to pull [%s]\n", err)
 			} else {
-				log.Println("git repository pulled successfully")
+				fmt.Println("git repository pulled successfully")
 			}
 
 			// run stow
 			err = exec.Command("stow", ".").Run()
 			if err != nil {
-				log.Println("stow execution failed: ", err)
+				fmt.Println("stow execution failed: ", err)
 			} else {
-				log.Println("stow execution succeeded")
+				fmt.Println("stow execution succeeded")
 			}
 		}
 	})
