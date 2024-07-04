@@ -23,7 +23,7 @@ func (c *httpClient) GetCommits() ([]GitHttpCommitResponse, error) {
 	}
 
 	request.Header.Add("Content-Type", "application/json")
-	request.Header.Add("Authorization", "Bearer ")
+	//request.Header.Add("Authorization", "Bearer ")
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
