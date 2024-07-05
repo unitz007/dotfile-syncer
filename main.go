@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -16,11 +18,13 @@ import (
 func main() {
 
 	var (
+		db                      = InitDB()
+		httpClient              = NewHttpClient()
 		rootCmd                 = cobra.Command{}
 		defaultDotFileDirectory = func() string {
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
-				log.Println("Unable to access home directory:", err)
+				Error("Unable to access home directory:", err.Error())
 				os.Exit(1)
 			}
 
@@ -33,24 +37,41 @@ func main() {
 	dotFilePath := rootCmd.Flags().StringP("dotfile-path", "d", defaultDotFileDirectory, "path to dotfile directory")
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Println(err)
+		Error(err.Error())
 		os.Exit(1)
 	}
 
+	config := &Config{
+		DotfilePath: *dotFilePath,
+		WebHook:     *webhookUrl,
+		Port:        *port,
+	}
+
+	syncer := &Syncer{config, db, httpClient}
+
+	syncHandler := NewSyncHandler(syncer, db, httpClient)
+
+	// first time sync
+	err := syncer.Sync(*dotFilePath)
+	if err != nil {
+		Error("could not perform first start-up sync: ", err.Error())
+	}
+
 	go func() {
-		cmd := exec.Command("smee", "--url", *webhookUrl, "--path", "/webhook", "--port", *port)
+
+		cmd := exec.Command("smee", "--url", config.WebHook, "--path", "/webhook", "--port", config.Port)
 		stdOutput, err := cmd.StdoutPipe()
 		stdErr, err := cmd.StderrPipe()
 
 		if err := cmd.Start(); err != nil {
-			log.Println(err.Error())
+			Error(err.Error())
 			os.Exit(1)
 		}
 
 		if stdErr != nil {
 			buf := bufio.NewReader(stdErr)
 			line, _ := buf.ReadString('\n')
-			log.Println("Error:", line)
+			Error("Error:", line)
 			return
 		}
 
@@ -59,40 +80,42 @@ func main() {
 		line, err := bufOutput.ReadString('\n')
 
 		for err == nil {
-			log.Print(line)
+			Info(line)
 			line, err = bufOutput.ReadString('\n')
 		}
 	}()
 
 	time.Sleep(3 * time.Second) // wait for smee server startup
 
-	log.Println("webhook server forwarded successfully from", *webhookUrl, "to port", *port)
+	Info("webhook server forwarded successfully from", config.WebHook, "to port", config.Port)
 
 	mux := http.NewServeMux()
+
+	// register handlers
+	mux.HandleFunc("/sync", syncHandler.Sync)
 	mux.HandleFunc("/webhook", func(writer http.ResponseWriter, request *http.Request) {
+
+		var commit GitWebHookCommitResponse
+
+		err := json.NewDecoder(request.Body).Decode(&commit)
+		if err != nil {
+			fmt.Println(err)
+		}
 
 		event := request.Header.Get("x-github-event")
 		if event == "push" {
-			log.Println("push event detected")
+			Info("push event detected...")
 
-			err := os.Chdir(*dotFilePath)
+			err := syncer.Sync(*dotFilePath)
 			if err != nil {
-				log.Println(err)
-			}
-
-			err = exec.Command("git", "pull", "origin", "main").Run()
-			if err != nil {
-				log.Printf("git repository failed to pull [%s]\n", err)
+				Info("error syncing:", err.Error())
 			} else {
-				log.Println("git repository pulled successfully")
-			}
+				t := &Commit{
+					Id:   commit.HeadCommit.Id,
+					Time: "",
+				}
 
-			// run stow
-			err = exec.Command("stow", ".").Run()
-			if err != nil {
-				log.Println("stow execution failed: ", err)
-			} else {
-				log.Println("stow execution succeeded")
+				_ = db.Create(t)
 			}
 		}
 	})
