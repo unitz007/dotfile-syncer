@@ -66,8 +66,6 @@ func (db *docliteImpl) Create(data *Commit) error {
 		_, err = db.data.Base().Insert(data)
 	}
 
-	//err := db.data.Base().UpdateOneDoc(1, data)
-
 	if err != nil {
 		return err
 	}
