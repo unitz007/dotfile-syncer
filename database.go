@@ -3,20 +3,22 @@ package main
 import (
 	"errors"
 	"github.com/haibeey/doclite"
+	"os"
+	"path/filepath"
 )
 
 type Database interface {
-	Create(data *Commit) error
-	Get(id int) (*Commit, error)
+	Create(data *SyncStash) error
+	Get(id int) (*SyncStash, error)
 }
 
 type docliteImpl struct {
 	data *doclite.Doclite
 }
 
-func (db *docliteImpl) Get(id int) (*Commit, error) {
+func (db *docliteImpl) Get(id int) (*SyncStash, error) {
 	defer db.close()
-	g := &Commit{}
+	syncStash := &SyncStash{}
 
 	var i int64 = 0
 	var err error
@@ -24,21 +26,37 @@ func (db *docliteImpl) Get(id int) (*Commit, error) {
 	for i = 0; i <= db.data.Base().GetCol().NumDocuments; i++ {
 
 		if id == int(i) {
-			err = db.data.Base().FindOne(i, g)
+			err = db.data.Base().FindOne(i, syncStash)
 			break
 		}
 	}
 
-	if g.Id == "" {
+	if syncStash.Commit == nil {
 		err = errors.New("not found")
 	}
 
-	return g, err
+	return syncStash, err
 }
 
 func InitDB() Database {
 
-	col := doclite.Connect("dotfile-agent.doclite")
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		Error(err.Error())
+		os.Exit(1)
+	}
+
+	configDir = filepath.Join(configDir, "dotfile-syncer")
+
+	if _, err := os.Stat(configDir); err != nil && os.IsNotExist(err) {
+		err = os.Mkdir(configDir, 0700)
+		if err != nil {
+			Error(err.Error())
+			os.Exit(1)
+		}
+	}
+
+	col := doclite.Connect(filepath.Join(configDir, "dotfile-agent.doclite"))
 
 	return &docliteImpl{
 		data: col,
@@ -46,7 +64,7 @@ func InitDB() Database {
 
 }
 
-func (db *docliteImpl) Create(data *Commit) error {
+func (db *docliteImpl) Create(data *SyncStash) error {
 	defer db.close()
 
 	var err error

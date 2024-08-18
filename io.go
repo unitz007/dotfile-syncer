@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 )
 
 func Info(v ...string) {
@@ -10,7 +11,7 @@ func Info(v ...string) {
 		s = s + " " + c
 	}
 
-	fmt.Println("INFO:", s)
+	fmt.Println(time.Now().Format(time.RFC3339), "INFO:", s)
 }
 
 func Error(v ...string) {
@@ -19,5 +20,5 @@ func Error(v ...string) {
 		s = s + " " + c
 	}
 
-	fmt.Println("ERROR:", s)
+	fmt.Println(time.Now().Format(time.RFC3339), "ERROR:", s)
 }
