@@ -51,6 +51,7 @@ func (s SyncHandler) Sync(writer http.ResponseWriter, request *http.Request) {
 		syncStatus, err := s.db.Get(1)
 		if err != nil {
 			Error(err.Error())
+			return
 		}
 
 		remoteCommit := remoteCommit(s.httpClient)
