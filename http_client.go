@@ -2,10 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
-	"os"
 )
 
 type HttpClient interface {
@@ -24,13 +22,8 @@ func (c *httpClient) GetCommits() ([]GitHttpCommitResponse, error) {
 		return nil, err
 	}
 
-	gitToken, ok := os.LookupEnv("GITHUB_TOKEN")
-	if !ok {
-		return nil, errors.New("GITHUB_TOKEN environment variable not set")
-	}
-
 	request.Header.Add("Content-Type", "application/json")
-	request.Header.Add("Authorization", "Bearer "+gitToken)
+	//request.Header.Add("Authorization", "Bearer ")
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
