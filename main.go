@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -52,7 +51,7 @@ func main() {
 	syncHandler := NewSyncHandler(syncer, db, httpClient)
 
 	// first time sync
-	err := syncer.Sync(*dotFilePath)
+	err := syncer.Sync(*dotFilePath, "Automatic")
 	if err != nil {
 		Error("could not perform first start-up sync: ", err.Error())
 	}
@@ -99,14 +98,14 @@ func main() {
 
 		err := json.NewDecoder(request.Body).Decode(&commit)
 		if err != nil {
-			fmt.Println(err)
+			Info(err.Error())
 		}
 
 		event := request.Header.Get("x-github-event")
 		if event == "push" {
 			Info("push event detected...")
 
-			err := syncer.Sync(*dotFilePath)
+			err := syncer.Sync(*dotFilePath, "Automatic")
 			if err != nil {
 				Info("error syncing:", err.Error())
 			} else {
@@ -115,7 +114,13 @@ func main() {
 					Time: "",
 				}
 
-				_ = db.Create(t)
+				syncStash := &SyncStash{
+					Commit: t,
+					Type:   "Automatic",
+					Time:   time.Now().UTC().Format(time.RFC3339),
+				}
+
+				_ = db.Create(syncStash)
 			}
 		}
 	})

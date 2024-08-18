@@ -13,6 +13,8 @@ type GitWebHookCommitResponse struct {
 
 type GitPullTransform struct {
 	IsSync       bool    `json:"is_synced"`
+	LastSyncTime string  `json:"last_sync_time"`
+	LastSyncType string  `json:"last_sync_type"`
 	RemoteCommit *Commit `json:"remote_commit"`
 	LocalCommit  *Commit `json:"local_commit"`
 }
@@ -24,7 +26,16 @@ type GitHttpCommitResponse struct {
 	} `json:"commit"`
 }
 
-func InitGitTransform(localCommit *Commit, remoteCommit *Commit) GitPullTransform {
+type SyncStash struct {
+	Commit *Commit
+	Time   string
+	Type   string
+}
+
+func InitGitTransform(
+	localCommit *Commit,
+	remoteCommit *Commit,
+) GitPullTransform {
 	return GitPullTransform{
 		LocalCommit:  localCommit,
 		RemoteCommit: remoteCommit,

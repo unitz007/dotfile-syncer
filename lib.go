@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 )
 
 type Syncer struct {
@@ -12,7 +13,7 @@ type Syncer struct {
 	httpClient HttpClient
 }
 
-func (s *Syncer) Sync(dotFilePath string) error {
+func (s *Syncer) Sync(dotFilePath string, syncType string) error {
 
 	Info("Sync starting...")
 
@@ -48,12 +49,18 @@ func (s *Syncer) Sync(dotFilePath string) error {
 		Id:   headCommit.Sha,
 		Time: "",
 	}
-	err = s.db.Create(commit)
+
+	syncStash := SyncStash{
+		Commit: commit,
+		Type:   syncType,
+		Time:   time.Now().Format(time.RFC3339),
+	}
+
+	err = s.db.Create(&syncStash)
 	if err != nil {
 		return err
 	}
 
 	Info("Sync completed...")
-
 	return nil
 }
