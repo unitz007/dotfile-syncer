@@ -1,1 +1,1 @@
-# dotfile-agent
+# dotfile-syncer
