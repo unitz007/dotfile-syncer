@@ -42,7 +42,7 @@ func (s SyncHandler) Sync(writer http.ResponseWriter, request *http.Request) {
 		if err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			Error(err.Error())
-			writeResponse(writer, err.Error(), nil)
+			writeResponse(writer, err.Error(), err.Error())
 		} else {
 			writeResponse(writer, "Sync completed...", "Sync completed...")
 		}

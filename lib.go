@@ -24,7 +24,7 @@ func (s *Syncer) Sync(dotFilePath string, syncType string) error {
 	}
 
 	// `git pull origin main` command
-	err = exec.Command("git", "pull", "origin", "main").Run()
+	err = exec.Command("git", "pull", "origin", "main", "--rebase").Run()
 	if err != nil {
 		return fmt.Errorf("sync failed [git pull command failed with: %s]", err)
 	}

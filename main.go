@@ -21,7 +21,7 @@ func main() {
 		httpClient              = NewHttpClient()
 		rootCmd                 = cobra.Command{}
 		defaultDotFileDirectory = func() string {
-			homeDir, err := os.UserHomeDir()
+			homeDir, err := os.UserConfigDir()
 			if err != nil {
 				Error("Unable to access home directory:", err.Error())
 				os.Exit(1)
@@ -107,7 +107,7 @@ func main() {
 
 			err := syncer.Sync(*dotFilePath, "Automatic")
 			if err != nil {
-				Info("error syncing:", err.Error())
+				Info("error syncing on path:", *dotFilePath, err.Error())
 			} else {
 				t := &Commit{
 					Id:   commit.HeadCommit.Id,
