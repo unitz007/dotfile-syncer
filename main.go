@@ -103,7 +103,7 @@ func main() {
 
 		event := request.Header.Get("x-github-event")
 		if event == "push" {
-			Info("push event detected...")
+			Info("changes detected...")
 
 			err := syncer.Sync(*dotFilePath, "Automatic")
 			if err != nil {

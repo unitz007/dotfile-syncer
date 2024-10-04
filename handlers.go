@@ -42,9 +42,9 @@ func (s SyncHandler) Sync(writer http.ResponseWriter, request *http.Request) {
 		if err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			Error(err.Error())
-			writeResponse(writer, err.Error(), err.Error())
+			writeResponse(writer, "Sync failed", err.Error())
 		} else {
-			writeResponse(writer, "Sync completed...", "Sync completed...")
+			writeResponse(writer, "Sync completed...", nil)
 		}
 	case http.MethodGet: // GET
 
@@ -70,6 +70,6 @@ func writeResponse(writer io.Writer, msg string, payload any) {
 	body := make(map[string]any, 2)
 	body["msg"] = msg
 	body["payload"] = payload
-	_ = json.NewEncoder(writer).Encode(payload)
+	_ = json.NewEncoder(writer).Encode(body)
 
 }

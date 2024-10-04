@@ -23,14 +23,21 @@ func (s *Syncer) Sync(dotFilePath string, syncType string) error {
 		return err
 	}
 
+	// look up git
+	path, err := exec.LookPath("git")
+	if err != nil {
+		return err
+	}
+
 	// `git pull origin main` command
-	err = exec.Command("git", "pull", "origin", "main", "--rebase").Run()
+	err = exec.Command(path, "pull", "origin", "main", "--rebase").Run()
 	if err != nil {
 		return fmt.Errorf("sync failed [git pull command failed with: %s]", err)
 	}
 
 	// `stow .` command
-	err = exec.Command("stow", ".").Run()
+	path, err = exec.LookPath("stow")
+	err = exec.Command(path, ".").Run()
 	if err != nil {
 		return fmt.Errorf("sync failed [stow execution failed: %v]", err)
 	}
