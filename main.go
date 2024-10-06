@@ -70,7 +70,7 @@ func main() {
 		if stdErr != nil {
 			buf := bufio.NewReader(stdErr)
 			line, _ := buf.ReadString('\n')
-			Error("Error:", line)
+			Error(line)
 			return
 		}
 
